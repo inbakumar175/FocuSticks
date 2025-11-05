@@ -17,7 +17,7 @@ import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 
 @Composable
-fun LoginScreen(nav: NavHostController) {
+fun loginscreen(nav: NavHostController) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
@@ -93,7 +93,6 @@ fun LoginScreen(nav: NavHostController) {
 
                 loading = true
                 val auth = Firebase.auth
-
                 auth.signInWithEmailAndPassword(trimmedEmail, password)
                     .addOnSuccessListener {
                         loading = false

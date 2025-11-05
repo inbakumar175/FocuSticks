@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "399044514693",
+    "project_id": "focus-sticks",
+    "storage_bucket": "focus-sticks.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:399044514693:android:c8a1792c3ec7e59f252aec",
+        "android_client_info": {
+          "package_name": "com.sample.focusticks"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCa6st3cyQp4Dc2eKfzgQ_4bFYeUgX482Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
