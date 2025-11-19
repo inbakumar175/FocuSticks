@@ -1,4 +1,5 @@
-package com.example.focusticks.auth
+package com.example.focusticks.ai
+
 import android.graphics.Bitmap
 import android.util.Base64
 import org.json.JSONArray

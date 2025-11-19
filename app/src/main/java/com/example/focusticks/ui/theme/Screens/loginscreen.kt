@@ -1,144 +1,172 @@
 package com.example.focusticks.ui.screens
-
-import android.util.Patterns
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
-import com.google.firebase.auth.FirebaseAuthException
+import com.google.firebase.Timestamp
 import com.google.firebase.auth.ktx.auth
+import com.google.firebase.firestore.SetOptions
+import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LoginScreen(nav: NavHostController) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var showPassword by remember { mutableStateOf(false) }
-    var errorText by remember { mutableStateOf("") }
-    var loading by remember { mutableStateOf(false) }
+fun ProfileScreen(nav: NavHostController) {
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("FocuSticks", style = MaterialTheme.typography.headlineLarge)
-        Spacer(Modifier.height(24.dp))
+    val uid = Firebase.auth.currentUser?.uid ?: return
+    val email = Firebase.auth.currentUser?.email ?: ""
+    val db = Firebase.firestore
 
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it; if (errorText.isNotEmpty()) errorText = "" },
-            label = { Text("Email") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
+    var name by remember { mutableStateOf("") }
+    var studentId by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    var editing by remember { mutableStateOf(false) }
 
-        if (errorText.isNotEmpty()) {
-            Spacer(Modifier.height(6.dp))
-            Text(text = errorText, color = Color.Red, style = MaterialTheme.typography.bodySmall)
-            Spacer(Modifier.height(6.dp))
-        } else {
-            Spacer(Modifier.height(12.dp))
+    LaunchedEffect(uid) {
+        db.collection("users").document(uid)
+            .addSnapshotListener { snap, _ ->
+                name = snap?.getString("name") ?: ""
+                studentId = snap?.getString("studentId") ?: ""
+                phone = snap?.getString("phone") ?: ""
+            }
+    }
+
+    Scaffold(
+        topBar = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { nav.popBackStack() }) {
+                    Icon(Icons.Filled.ArrowBack, contentDescription = null)
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "Profile",
+                    style = MaterialTheme.typography.headlineMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = "Edit",
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .padding(end = 20.dp)
+                        .clickable { editing = true }
+                )
+                Text(
+                    text = "Logout",
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable { Firebase.auth.signOut() }
+                )
+            }
         }
+    ) { padding ->
 
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it; if (errorText.isNotEmpty()) errorText = "" },
-            label = { Text("Password") },
-            singleLine = true,
-            visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
-            trailingIcon = {
-                TextButton(onClick = { showPassword = !showPassword }) {
-                    Text(if (showPassword) "Hide" else "Show")
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(Modifier.height(8.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(
-                "Forgot Password",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.clickable { nav.navigate("forgot_step_1") }
-            )
-            Text(
-                "Sign up",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.clickable { nav.navigate("signup") }
-            )
-        }
-
-        Spacer(Modifier.height(16.dp))
-        Button(
-            onClick = {
-                errorText = ""
-                val trimmedEmail = email.trim().lowercase()
-                if (!Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches()) {
-                    errorText = "Enter a valid email address."
-                    return@Button
-                }
-                if (password.isBlank()) {
-                    errorText = "Enter your password."
-                    return@Button
-                }
-
-                loading = true
-                val auth = Firebase.auth
-
-                auth.signInWithEmailAndPassword(trimmedEmail, password)
-                    .addOnSuccessListener {
-                        loading = false
-                        nav.navigate("dashboard") { launchSingleTop = true }
-                    }
-                    .addOnFailureListener { ex ->
-                        val code = (ex as? FirebaseAuthException)?.errorCode?.uppercase().orEmpty()
-
-                        when {
-                            code == "ERROR_WRONG_PASSWORD" -> {
-                                loading = false
-                                errorText = "The password you entered is incorrect."
-                            }
-                            code == "ERROR_USER_NOT_FOUND" -> {
-                                loading = false
-                                errorText = "No account found with this email."
-                            }
-                            code == "ERROR_INVALID_EMAIL" -> {
-                                loading = false
-                                errorText = "Enter a valid email address."
-                            }
-                            else -> {
-                                // Ambiguous case like INVALID_LOGIN_CREDENTIALS → check if the email exists
-                                auth.fetchSignInMethodsForEmail(trimmedEmail)
-                                    .addOnSuccessListener { result ->
-                                        loading = false
-                                        val methods = result.signInMethods ?: emptyList()
-                                        errorText = if (methods.isEmpty()) {
-                                            "No account found with this email."
-                                        } else {
-                                            "The password you entered is incorrect."
-                                        }
-                                    }
-                                    .addOnFailureListener {
-                                        loading = false
-                                        errorText = "Login failed. Please try again."
-                                    }
-                            }
-                        }
-                    }
-            },
-            enabled = email.isNotBlank() && password.isNotBlank() && !loading,
-            modifier = Modifier.fillMaxWidth()
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .padding(16.dp)
+                .fillMaxSize()
         ) {
-            Text(if (loading) "Signing in…" else "Confirm")
+
+            if (editing) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = studentId,
+                    onValueChange = { studentId = it },
+                    label = { Text("Student ID") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = { phone = it },
+                    label = { Text("Phone no") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(20.dp))
+
+                Button(
+                    onClick = {
+                        db.collection("users").document(uid)
+                            .set(
+                                mapOf(
+                                    "name" to name.trim(),
+                                    "studentId" to studentId.trim(),
+                                    "phone" to phone.trim(),
+                                    "updatedAt" to Timestamp.now()
+                                ),
+                                SetOptions.merge()
+                            )
+                        editing = false
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Save")
+                }
+            } else {
+                Text("Name", style = MaterialTheme.typography.labelLarge)
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = {},
+                    readOnly = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(12.dp))
+
+                Text("Student ID", style = MaterialTheme.typography.labelLarge)
+                OutlinedTextField(
+                    value = studentId,
+                    onValueChange = {},
+                    readOnly = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(12.dp))
+
+                Text("Email", style = MaterialTheme.typography.labelLarge)
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = {},
+                    readOnly = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(12.dp))
+
+                Text("Phone no", style = MaterialTheme.typography.labelLarge)
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = {},
+                    readOnly = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            Spacer(Modifier.height(32.dp))
+
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "View streaks",
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable { nav.navigate("streak") }
+                )
+            }
         }
     }
 }

@@ -1,4 +1,6 @@
-package com.example.focusticks.ui.theme
+package com.example.focusticks.ui.theme.Screens
+
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -91,7 +93,3 @@ fun StreakScreen(nav: NavHostController) {
         }
     }
 }
-
-
-
-
