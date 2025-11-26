@@ -2,6 +2,7 @@ package com.example.focusticks.ui.theme.Screens
 
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
@@ -10,86 +11,129 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
-import com.google.firebase.Timestamp
+import com.example.focusticks.User
+import com.example.focusticks.calculateStreak
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.firestore.toObject
 import com.google.firebase.ktx.Firebase
-import java.time.LocalDate
-import java.time.ZoneId
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StreakScreen(nav: NavHostController) {
+
     val uid = Firebase.auth.currentUser?.uid ?: return
-    val db = Firebase.firestore
+    val ref = Firebase.firestore.collection("users").document(uid)
 
-    var streak by remember { mutableStateOf(0) }
-    var total by remember { mutableStateOf(0) }
-    var points by remember { mutableStateOf(0L) }
+    var totalPoints by remember { mutableStateOf(0L) }
+    var currentStreak by remember { mutableStateOf(0) }
+    var loading by remember { mutableStateOf(true) }
 
-    DisposableEffect(uid) {
-        val reg1 = db.collection("tasks")
-            .whereEqualTo("uid", uid)
-            .whereEqualTo("completed", true)
-            .addSnapshotListener { snap, _ ->
-                val done = snap?.documents.orEmpty()
-                total = done.size
-
-                val days = done.mapNotNull {
-                    val t = it.getTimestamp("completedAt") ?: return@mapNotNull null
-                    t.toDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate()
-                }.toSet()
-
-                val today = LocalDate.now()
-                var s = 0
-                var cursor = today
-                while (days.contains(cursor)) {
-                    s++
-                    cursor = cursor.minusDays(1)
-                }
-                streak = s
+    LaunchedEffect(Unit) {
+        ref.get()
+            .addOnSuccessListener { doc ->
+                val user = doc.toObject<User>() ?: User(uid = uid)
+                totalPoints = user.points
+                currentStreak = calculateStreak(user.lastTaskCompleted)
+                loading = false
             }
-
-        val reg2 = db.collection("users")
-            .document(uid)
-            .addSnapshotListener { snap, _ ->
-                points = snap?.getLong("points") ?: 0L
+            .addOnFailureListener {
+                loading = false
             }
-
-        onDispose {
-            reg1.remove()
-            reg2.remove()
-        }
     }
 
     Scaffold(
         topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = { nav.popBackStack() }) {
-                    Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
-                }
-                Spacer(Modifier.width(8.dp))
-                Text("Streak", style = MaterialTheme.typography.headlineMedium)
-            }
+            TopAppBar(
+                title = { Text("Streak & Points") },
+                navigationIcon = {
+                    IconButton(onClick = { nav.popBackStack() }) {
+                        Icon(Icons.Filled.ArrowBack, null)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            )
         }
-    ) { padding ->
+    ) { pad ->
+
+        if (loading) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .padding(pad),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+            return@Scaffold
+        }
 
         Column(
-            modifier = Modifier
-                .padding(padding)
-                .padding(16.dp)
+            Modifier
                 .fillMaxSize()
+                .padding(pad)
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Text("Current streak: $streak days", style = MaterialTheme.typography.titleMedium)
+
+            Card(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                ),
+                elevation = CardDefaults.cardElevation(4.dp)
+            ) {
+                Column(
+                    Modifier
+                        .padding(24.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        "Total Points: $totalPoints",
+                        style = MaterialTheme.typography.headlineMedium
+                    )
+                }
+            }
+
+            Card(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                ),
+                elevation = CardDefaults.cardElevation(4.dp)
+            ) {
+                Column(
+                    Modifier
+                        .padding(24.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        "Current Streak: $currentStreak 🔥",
+                        style = MaterialTheme.typography.headlineMedium
+                    )
+                }
+            }
+
             Spacer(Modifier.height(16.dp))
-            Text("Completed tasks: $total", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(16.dp))
-            Text("Total points: $points", style = MaterialTheme.typography.titleMedium)
+
+            Text(
+                "Complete a task daily to maintain your streak!",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
+

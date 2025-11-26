@@ -2,171 +2,113 @@ package com.example.focusticks.ui.screens
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
-import com.google.firebase.Timestamp
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileScreen(nav: NavHostController) {
+fun LoginScreen(nav: NavHostController) {
 
-    val uid = Firebase.auth.currentUser?.uid ?: return
-    val email = Firebase.auth.currentUser?.email ?: ""
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf("") }
+    var showPw by remember { mutableStateOf(false) }
+
     val db = Firebase.firestore
 
-    var name by remember { mutableStateOf("") }
-    var studentId by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
-    var editing by remember { mutableStateOf(false) }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Top
+    ) {
 
-    LaunchedEffect(uid) {
-        db.collection("users").document(uid)
-            .addSnapshotListener { snap, _ ->
-                name = snap?.getString("name") ?: ""
-                studentId = snap?.getString("studentId") ?: ""
-                phone = snap?.getString("phone") ?: ""
-            }
-    }
+        Spacer(Modifier.height(40.dp))
 
-    Scaffold(
-        topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = { nav.popBackStack() }) {
-                    Icon(Icons.Filled.ArrowBack, contentDescription = null)
+        Text("FocuSticks", fontSize = 32.sp)
+
+        Spacer(Modifier.height(40.dp))
+
+        OutlinedTextField(
+            value = email,
+            onValueChange = {
+                email = it
+                error = ""
+            },
+            label = { Text("Email") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = password,
+            onValueChange = {
+                password = it
+                error = ""
+            },
+            label = { Text("Password") },
+            visualTransformation = if (showPw) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                IconButton(onClick = { showPw = !showPw }) {
+                    Icon(
+                        imageVector = if (showPw) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                        contentDescription = null
+                    )
                 }
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = "Profile",
-                    style = MaterialTheme.typography.headlineMedium,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = "Edit",
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .padding(end = 20.dp)
-                        .clickable { editing = true }
-                )
-                Text(
-                    text = "Logout",
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable { Firebase.auth.signOut() }
-                )
-            }
-        }
-    ) { padding ->
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
 
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .padding(16.dp)
-                .fillMaxSize()
+        Spacer(Modifier.height(12.dp))
+
+        Text(
+            "Forgot Password",
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.clickable { nav.navigate("forgot") }
+        )
+
+        Spacer(Modifier.height(20.dp))
+        Button(
+            onClick = {
+                Firebase.auth.signInWithEmailAndPassword(email.trim(), password.trim())
+                    .addOnSuccessListener {
+                        nav.navigate("dashboard") {
+                            popUpTo("login") { inclusive = true }
+                        }
+                    }
+                    .addOnFailureListener {
+                        error = "Invalid email or password"
+                    }
+            },
+            modifier = Modifier.fillMaxWidth().height(50.dp)
         ) {
+            Text("Confirm", fontSize = 16.sp)
+        }
+        Spacer(Modifier.height(12.dp))
 
-            if (editing) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Name") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = studentId,
-                    onValueChange = { studentId = it },
-                    label = { Text("Student ID") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = phone,
-                    onValueChange = { phone = it },
-                    label = { Text("Phone no") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(20.dp))
+        Text(
+            "Sign Up",
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.clickable { nav.navigate("signup") }
+        )
 
-                Button(
-                    onClick = {
-                        db.collection("users").document(uid)
-                            .set(
-                                mapOf(
-                                    "name" to name.trim(),
-                                    "studentId" to studentId.trim(),
-                                    "phone" to phone.trim(),
-                                    "updatedAt" to Timestamp.now()
-                                ),
-                                SetOptions.merge()
-                            )
-                        editing = false
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Save")
-                }
-            } else {
-                Text("Name", style = MaterialTheme.typography.labelLarge)
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = {},
-                    readOnly = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(12.dp))
-
-                Text("Student ID", style = MaterialTheme.typography.labelLarge)
-                OutlinedTextField(
-                    value = studentId,
-                    onValueChange = {},
-                    readOnly = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(12.dp))
-
-                Text("Email", style = MaterialTheme.typography.labelLarge)
-                OutlinedTextField(
-                    value = email,
-                    onValueChange = {},
-                    readOnly = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(12.dp))
-
-                Text("Phone no", style = MaterialTheme.typography.labelLarge)
-                OutlinedTextField(
-                    value = phone,
-                    onValueChange = {},
-                    readOnly = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            Spacer(Modifier.height(32.dp))
-
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "View streaks",
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable { nav.navigate("streak") }
-                )
-            }
+        if (error.isNotEmpty()) {
+            Spacer(Modifier.height(20.dp))
+            Text(error, color = MaterialTheme.colorScheme.error)
         }
     }
 }

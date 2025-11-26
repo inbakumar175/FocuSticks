@@ -53,6 +53,7 @@ android {
 
 dependencies {
 
+    implementation(libs.androidx.core.splashscreen)
     val composeBom = platform("androidx.compose:compose-bom:2024.09.02")
     implementation(composeBom)
     androidTestImplementation(composeBom)
@@ -73,6 +74,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
     implementation("com.google.mlkit:text-recognition:16.0.0")
+    implementation("androidx.core:core-splashscreen:1.2.0")
+
 
     val firebaseBom = platform("com.google.firebase:firebase-bom:33.5.1")
     implementation(firebaseBom)
