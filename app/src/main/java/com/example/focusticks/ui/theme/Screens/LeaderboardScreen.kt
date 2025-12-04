@@ -5,90 +5,155 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import com.example.focusticks.User
 import com.google.firebase.auth.ktx.auth
+import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 
-data class LeaderUser(
-    val uid: String = "",
-    val name: String = "",
-    val points: Int = 0
-)
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LeaderboardScreen(nav: NavHostController) {
 
-    val uid = Firebase.auth.currentUser?.uid ?: return
     val db = Firebase.firestore
+    val currentUid = Firebase.auth.currentUser?.uid
+    var leaderboard by remember { mutableStateOf(listOf<User>()) }
+    var isLoading by remember { mutableStateOf(true) }
 
-    var list by remember { mutableStateOf(listOf<LeaderUser>()) }
-
-    LaunchedEffect(true) {
+    LaunchedEffect(Unit) {
         db.collection("users")
-            .addSnapshotListener { snap, _ ->
-                val users = snap?.documents?.mapNotNull { doc ->
-                    LeaderUser(
-                        uid = doc.id,
-                        name = doc.getString("name") ?: "Unknown",
-                        points = doc.getLong("points")?.toInt() ?: 0
-                    )
-                } ?: emptyList()
+            .orderBy("points", Query.Direction.DESCENDING)
+            .get()
+            .addOnSuccessListener { snap ->
 
-                list = users.sortedByDescending { it.points }.take(10)
+                leaderboard = snap.documents.map { doc ->
+
+                    val name = doc.getString("name") ?: ""
+                    val studentId = doc.getString("studentId") ?: ""
+                    val email = doc.getString("email") ?: ""
+                    val dob = doc.getString("dob") ?: ""
+                    val points = doc.getLong("points") ?: 0L
+                    val lastTaskCompleted = doc.getLong("lastTaskCompleted") ?: 0L
+                    val phoneNo = doc.getString("phoneNo") ?: doc.getString("phone") ?: ""
+
+                    User(
+                        uid = doc.id,
+                        name = name,
+                        studentId = studentId,
+                        phoneNo = phoneNo,
+                        email = email,
+                        dob = dob,
+                        points = points,
+                        lastTaskCompleted = lastTaskCompleted
+                    )
+                }
+
+                isLoading = false
+            }
+            .addOnFailureListener {
+                isLoading = false
             }
     }
 
     Scaffold(
         topBar = {
             Row(
-                modifier = Modifier
+                Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.primaryContainer)
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { nav.popBackStack() }) {
-                    Icon(Icons.Filled.ArrowBack, contentDescription = null)
-                }
-                Text("Leaderboard", fontSize = MaterialTheme.typography.headlineMedium.fontSize)
+                Text("Leaderboard 🏆", style = MaterialTheme.typography.headlineMedium)
             }
         }
-    ) { padding ->
+    ) { pad ->
 
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .padding(16.dp)
-        ) {
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+        if (isLoading) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .padding(pad),
+                contentAlignment = Alignment.Center
             ) {
-                Text("Name", style = MaterialTheme.typography.titleMedium)
-                Text("Points", style = MaterialTheme.typography.titleMedium)
+                CircularProgressIndicator()
             }
+            return@Scaffold
+        }
 
-            LazyColumn {
-                itemsIndexed(list) { index, user ->
+        LazyColumn(
+            modifier = Modifier
+                .padding(pad)
+                .padding(horizontal = 16.dp)
+                .fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            itemsIndexed(leaderboard) { index, user ->
+
+                val rank = index + 1
+                val isCurrentUser = user.uid == currentUid
+
+                val cardColor = when (rank) {
+                    1 -> Color(0xFFFFD700)
+                    2 -> Color(0xFFC0C0C0)
+                    3 -> Color(0xFFCD7F32)
+                    else -> MaterialTheme.colorScheme.surfaceVariant
+                }
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor =
+                            if (isCurrentUser) MaterialTheme.colorScheme.primaryContainer
+                            else cardColor
+                    ),
+                    elevation = CardDefaults.cardElevation(4.dp)
+                ) {
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(8.dp),
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("${index + 1}. ${user.name}")
-                        Text("${user.points}")
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("$rank.", style = MaterialTheme.typography.titleMedium)
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                user.name.ifBlank { "Anonymous" },
+                                style = MaterialTheme.typography.titleMedium
+                            )
+
+                            if (isCurrentUser) {
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    "(You)",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("${user.points} points", style = MaterialTheme.typography.bodyLarge)
+                            if (rank <= 3) {
+                                Spacer(Modifier.width(8.dp))
+                                Icon(
+                                    Icons.Filled.Star,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
                     }
                 }
             }
